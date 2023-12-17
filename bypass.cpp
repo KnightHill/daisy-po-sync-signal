@@ -9,11 +9,15 @@ DaisySeed hw;
 #define TEMPO_DEFAUT 120
 #define TEMPO_MAX 240
 
+constexpr float threshold = 0.05f;
+
 // tap tempo variables
 static uint32_t prev_ms = 0;
 static uint8_t tempo = TEMPO_DEFAUT;
 
+// when sync is used the signal will be split between audio (right) and sync (left).
 // sync modes: https://teenage.engineering/guides/po-33/en
+// set PO sync mode to SY1, SY3 or SY5
 
 static float left_cached = 0;
 
@@ -28,28 +32,27 @@ public:
 
 static void Callback(AudioHandle::InterleavingInputBuffer in, AudioHandle::InterleavingOutputBuffer out, size_t size)
 {
-  float left;
-
   for (size_t i = 0; i < size; i++) {
-    // right - signal
-    out[i] = out[i + 1] = in[i + 1];
-
     // left - sync
-    left = in[i];
-    if (left != left_cached) {
-      if (left_cached == 0 && left != 0) {
+    volatile float left = in[i];
+    if (fabs(left - left_cached) > threshold) {
+      // detect sync raising edge
+      if (left_cached < threshold && left > threshold) {
         uint32_t ms = System::GetNow();
         uint32_t diff = ms - prev_ms;
         uint32_t bpm = TempoUtils::ms_to_bpm(diff);
-        if (bpm >= TEMPO_MIN && bpm <= TEMPO_MAX) {
-          tempo = bpm;
-          // chopper.SetFreq(TempoUtils::tempo_to_freq(tempo));
-        }
+        // if (bpm >= TEMPO_MIN && bpm <= TEMPO_MAX) {
+        tempo = bpm;
+        // chopper.SetFreq(TempoUtils::tempo_to_freq(tempo));
+        //}
 
         prev_ms = ms;
       }
       left_cached = left;
     }
+
+    // right - audio
+    out[i] = out[i + 1] = in[i + 1];
   }
 }
 
