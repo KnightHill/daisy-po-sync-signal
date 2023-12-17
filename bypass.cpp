@@ -11,12 +11,11 @@ DaisySeed hw;
 
 // tap tempo variables
 static uint32_t prev_ms = 0;
-// static uint16_t tt_count = 0;
 static uint8_t tempo = TEMPO_DEFAUT;
 
-// https://modwiggler.com/forum/viewtopic.php?t=189932
+// sync modes: https://teenage.engineering/guides/po-33/en
 
-static float right_cached = 0;
+static float left_cached = 0;
 
 class TempoUtils
 {
@@ -29,16 +28,16 @@ public:
 
 static void Callback(AudioHandle::InterleavingInputBuffer in, AudioHandle::InterleavingOutputBuffer out, size_t size)
 {
-  float right;
+  float left;
 
   for (size_t i = 0; i < size; i++) {
-    // left - signal
-    out[i] = in[i];
+    // right - signal
+    out[i] = out[i + 1] = in[i + 1];
 
-    // right - sync
-    right = in[i + 1];
-    if (right != right_cached) {
-      if (right_cached == 0 && right != 0) {
+    // left - sync
+    left = in[i];
+    if (left != left_cached) {
+      if (left_cached == 0 && left != 0) {
         uint32_t ms = System::GetNow();
         uint32_t diff = ms - prev_ms;
         uint32_t bpm = TempoUtils::ms_to_bpm(diff);
@@ -49,10 +48,8 @@ static void Callback(AudioHandle::InterleavingInputBuffer in, AudioHandle::Inter
 
         prev_ms = ms;
       }
-      right_cached = right;
+      left_cached = left;
     }
-
-    out[i + 1] = right;
   }
 }
 
