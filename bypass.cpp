@@ -18,6 +18,7 @@ static uint8_t tempo = TEMPO_DEFAUT;
 // when sync is used the signal will be split between audio (right) and sync (left).
 // sync modes: https://teenage.engineering/guides/po-33/en
 // set PO sync mode to SY1, SY3 or SY5
+// https://p0k3t0.wordpress.com/2017/10/18/pocket-operator-signals/
 
 static float left_cached = 0;
 
@@ -30,13 +31,17 @@ public:
   static uint32_t ms_to_bpm(uint32_t ms) { return 60000 / ms; }
 };
 
-static void Callback(AudioHandle::InterleavingInputBuffer in, AudioHandle::InterleavingOutputBuffer out, size_t size)
+__attribute__((optimize("O0")))
+
+static void
+Callback(AudioHandle::InterleavingInputBuffer in, AudioHandle::InterleavingOutputBuffer out, size_t size)
 {
   for (size_t i = 0; i < size; i++) {
     // left - sync
     volatile float left = in[i];
     if (fabs(left - left_cached) > threshold) {
       // detect sync raising edge
+      // Single pulse, 2.5ms long, with an amplitude of 1V above ground reference.
       if (left_cached < threshold && left > threshold) {
         uint32_t ms = System::GetNow();
         uint32_t diff = ms - prev_ms;
