@@ -61,6 +61,12 @@ int main(void)
   hw.Init();
   hw.SetAudioBlockSize(4);
   hw.StartAudio(Callback);
+
+  // initialize the logger
+  hw.StartLog(false);
+
   while (1) {
+    System::Delay(1000);
+    hw.PrintLine("tempo: %d", tempo);
   }
 }
