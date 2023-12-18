@@ -1,18 +1,18 @@
 #include <string.h>
-#include "daisy_seed.h"
+#include "daisy_pod.h"
 
 using namespace daisy;
 
-DaisySeed hw;
+DaisyPod hw;
 
 #define TEMPO_MIN 30
 #define TEMPO_DEFAUT 120
 #define TEMPO_MAX 240
 
-constexpr float threshold = 0.05f;
+constexpr float threshold = 0.20f;
 
 // tap tempo variables
-static uint32_t prev_ms = 0;
+static uint32_t prev_timestamp = 0;
 static uint8_t tempo = TEMPO_DEFAUT;
 
 // when sync is used the signal will be split between audio (right) and sync (left).
@@ -29,35 +29,54 @@ public:
   static uint8_t freq_to_tempo(float freq) { return freq * 60.0f; }
   static float bpm_to_freq(uint32_t tempo) { return tempo / 60.0f; }
   static uint32_t ms_to_bpm(uint32_t ms) { return 60000 / ms; }
+  static uint32_t us_to_bpm(uint32_t us) { return 60000000 / us; }
+
+  static uint32_t fus_to_bpm(uint32_t us)
+  {
+    float fus = static_cast<float>(us);
+    float val = roundf(60000000.0f / fus);
+    return static_cast<uint32_t>(val);
+  }
 };
 
 __attribute__((optimize("O0")))
 
-static void
-Callback(AudioHandle::InterleavingInputBuffer in, AudioHandle::InterleavingOutputBuffer out, size_t size)
+void AudioCallback(AudioHandle::InputBuffer  in,
+                   AudioHandle::OutputBuffer out,
+                   size_t                    size)
 {
   for (size_t i = 0; i < size; i++) {
     // left - sync
-    volatile float left = in[i];
+    float left = in[0][i];
+    float right = in[1][i];
+
+    hw.led1.Set(left, left, left);
+    hw.led2.Set(right, right, right);
+    hw.UpdateLeds();
+
     if (fabs(left - left_cached) > threshold) {
       // detect sync raising edge
       // Single pulse, 2.5ms long, with an amplitude of 1V above ground reference.
       if (left_cached < threshold && left > threshold) {
-        uint32_t ms = System::GetNow();
-        uint32_t diff = ms - prev_ms;
-        uint32_t bpm = TempoUtils::ms_to_bpm(diff);
-        // if (bpm >= TEMPO_MIN && bpm <= TEMPO_MAX) {
-        tempo = bpm;
-        // chopper.SetFreq(TempoUtils::tempo_to_freq(tempo));
-        //}
+        // use usec
+        uint32_t now = System::GetUs();
+        uint32_t diff = now - prev_timestamp;
+        uint32_t bpm = TempoUtils::fus_to_bpm(diff) / 2;
 
-        prev_ms = ms;
+        if (bpm >= TEMPO_MIN && bpm <= TEMPO_MAX) {
+          tempo = bpm;
+          // chopper.SetFreq(TempoUtils::tempo_to_freq(tempo));
+        }
+
+        prev_timestamp = now;
       }
       left_cached = left;
     }
+    out[0][i] = left;
 
     // right - audio
-    out[i] = out[i + 1] = in[i + 1];
+    // out[i] = out[i + 1] = right;
+    out[1][i] = right;
   }
 }
 
@@ -65,13 +84,13 @@ int main(void)
 {
   hw.Init();
   hw.SetAudioBlockSize(4);
-  hw.StartAudio(Callback);
+  hw.StartAudio(AudioCallback);
 
   // initialize the logger
-  hw.StartLog(false);
+  hw.seed.StartLog(false);
 
   while (1) {
     System::Delay(1000);
-    hw.PrintLine("tempo: %d", tempo);
+    hw.seed.PrintLine("tempo: %d", tempo);
   }
 }
