@@ -1,8 +1,8 @@
 # Project Name
-TARGET = bypass
+TARGET = main
 
 # Sources
-CPP_SOURCES = bypass.cpp
+CPP_SOURCES = main.cpp
 
 # Library Locations
 DAISYSP_DIR ?= ../../DaisySP

@@ -11,7 +11,7 @@ DaisyPod hw;
 
 constexpr float threshold = 0.20f;
 
-// tap tempo variables
+// sync tempo variables
 static uint32_t prev_timestamp = 0;
 static uint8_t tempo = TEMPO_DEFAUT;
 
@@ -39,11 +39,9 @@ public:
   }
 };
 
-__attribute__((optimize("O0")))
+// __attribute__((optimize("O0")))
 
-void AudioCallback(AudioHandle::InputBuffer  in,
-                   AudioHandle::OutputBuffer out,
-                   size_t                    size)
+void AudioCallback(AudioHandle::InputBuffer in, AudioHandle::OutputBuffer out, size_t size)
 {
   for (size_t i = 0; i < size; i++) {
     // left - sync
@@ -58,24 +56,20 @@ void AudioCallback(AudioHandle::InputBuffer  in,
       // detect sync raising edge
       // Single pulse, 2.5ms long, with an amplitude of 1V above ground reference.
       if (left_cached < threshold && left > threshold) {
-        // use usec
         uint32_t now = System::GetUs();
         uint32_t diff = now - prev_timestamp;
         uint32_t bpm = TempoUtils::fus_to_bpm(diff) / 2;
 
         if (bpm >= TEMPO_MIN && bpm <= TEMPO_MAX) {
           tempo = bpm;
-          // chopper.SetFreq(TempoUtils::tempo_to_freq(tempo));
         }
 
         prev_timestamp = now;
       }
       left_cached = left;
     }
-    out[0][i] = left;
 
-    // right - audio
-    // out[i] = out[i + 1] = right;
+    out[0][i] = left;
     out[1][i] = right;
   }
 }
